@@ -18,3 +18,10 @@ street@cs.wisc.edu
 Olvi L. Mangasarian, Computer Sciences Dept., University of Wisconsin, 1210 West Dayton St., Madison, WI 53706
 olvi@cs.wisc.edu 
 
+<br><br>
+
+Relevant information
+
+Features are computed from a digitized image of a fine needle aspirate (FNA) of a breast mass.  They describe characteristics of the cell nuclei present in the image. A few of the images can be found at http://www.cs.wisc.edu/~street/images/
+
+
