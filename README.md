@@ -7,17 +7,14 @@ and 0.97 accuracies respectively along with decision boundaries and ROC curves
 
 Source Information
 
-a) Creators: 
+a) Creators of data: 
 
-	Dr. William H. Wolberg, General Surgery Dept., University of
-  Wisconsin,  Clinical Sciences Center, Madison, WI 53792
-	wolberg@eagle.surgery.wisc.edu
+Dr. William H. Wolberg, General Surgery Dept., University of Wisconsin,  Clinical Sciences Center, Madison, WI 53792
+wolberg@eagle.surgery.wisc.edu
 
-	W. Nick Street, Computer Sciences Dept., University of
-	Wisconsin, 1210 West Dayton St., Madison, WI 53706
-	street@cs.wisc.edu  608-262-6619
+W. Nick Street, Computer Sciences Dept., University of Wisconsin, 1210 West Dayton St., Madison, WI 53706
+street@cs.wisc.edu  
 
-	Olvi L. Mangasarian, Computer Sciences Dept., University of
-	Wisconsin, 1210 West Dayton St., Madison, WI 53706
-	olvi@cs.wisc.edu 
+Olvi L. Mangasarian, Computer Sciences Dept., University of Wisconsin, 1210 West Dayton St., Madison, WI 53706
+olvi@cs.wisc.edu 
 
