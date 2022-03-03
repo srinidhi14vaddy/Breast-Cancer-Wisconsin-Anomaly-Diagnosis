@@ -1,0 +1,887 @@
+---
+title: "HW - 2"
+author: "Srinidhi"
+date: "2/2/2022"
+output: html_document
+---
+
+## Homework #2
+
+### By: Venkat Srinidhi Vaddy, 2173456
+
+
+```{r}
+#load the libraries
+library(GGally)
+library(MASS)
+library(ggplot2)
+library(dplyr)
+library(class)
+library(dummies)
+library(tidyverse)
+```
+
+#### 1. Data exploration + Logistic Regression
+
+```{r}
+#load the data
+df = read.csv("wdbc.data")
+
+#displaying the top 5 rows of dataframe
+head(df)
+```
+
+##### (a) Describe the data: sample size n, number of predictors p, and number of observations in each class.
+
+```{r}
+# number of rows in the dataframe
+nrow(df)
+
+# number of predictors except target
+length(df) - 1
+
+# number of observations in each class
+table(df$M)
+```
+
+The number of rows or entries in dataframe is 568 with 31 predictors or variables. Including the target/response variable, the total length of the dataframe is 32. 
+
+There are 357 entries in Benign class and 211 entries in Malignant class. 
+
+##### (b) Divide the data into a training set of 400 observations, and a test set; from now on, unless specified, work only on the training set.
+
+```{r}
+#setting aside 400 samples
+#setting seed to fix the dataset
+set.seed(0)
+
+#sampling 400 ids
+train_id = sample(nrow(df), 400)
+
+#selecting only X17.99 and X10.38 columns in the training and testing datasets for the selected rows
+train_df = df[train_id, 2:4]
+test_df  = df[-train_id, 2:4]
+head(train_df)
+```
+
+##### (c) Make a scatterplot displaying Y (color or shape encoded) and the predictors X1, X2 (on the x- and y-axis). Based on this scatterplot, do you think it will be possible to accurately predict the outcome from the predictors? Motivate your answer.
+
+```{r}
+#plotting scatter plot between the target variable and the predictors
+# displaying target variable with color encoding
+
+ggplot(train_df, aes(x = X17.99, y = X10.38, color = M)) +
+  geom_point() +
+  labs(x = 'Average cell nuclei radius', y = 'Average cell nuclei texture', title = 'Average radius vs Average texture', color = 'Outcome')
+```
+
+It is possible to accurately predict the classes from the predictors as there is clear color coded distinction between the two classes - B and M. We can observe a decision boundary between the observations of the two classes. The benign class has observations with lower average cell nuclei radius and lower average cell texture. The malignant class has observations with higher average cell nuclei radius and higher average cell texture.  
+
+
+##### (d) Fit a logistic regression model to predict Y and make a table, like Table 4.3 in the textbook, displaying the coefficient estimates, standard errors, and p-values (use command summary). Give an interpretation of the values of the coefficient estimates.
+
+```{r}
+train_df$M <- as.factor(train_df$M)
+
+#fitting the logistic regression model to the data with X17.99 and X10.38 as the two predictors
+glm.model = glm(formula = M~., family = binomial(link = "logit"), data = train_df)
+
+#will print the categorical value assigned to each class
+contrasts(train_df$M)
+
+#to print the coefficients of the model
+coef(glm.model)
+
+#summary of the model - coefficients, t value, p value
+summary(glm.model)
+```
+
+The predictor X17.99 has a coefficient of 0.9678 and the p value for this coefficient is < 2e-16 which is very small and less than 0.05. It is statiscally significant  and can reject the null hypothesis that there is no correlation between the predictor X17.99 and the outcome. 
+
+A unit increase in X17.99 leads to increase in the log odds of the response by 0.9678 that is, the log odds of the tumor being Malignant increases by 0.9678 when other predictor is kept constant. 
+
+The predictor X10.38 has a coefficient of 0.2486 and the p value for this coefficient is < 2e-16 which is very small and less than 0.05. It is statistically significant and we can reject the null hypothesis that there is no correlation between the predictor X10.38 and the outcome. 
+
+A unit increase in the predictor X10.38 leads to the increase in the log odds of the tumor being malignant by 0.2486 while keeping X17.99 as constant. 
+
+
+#### (e) Use the coefficient estimates to manually calculate the predicted probability P(Y = M | (X1,X2) = (10,12)) writing explicitly every step. Compare your result with the prediction computed with predict.
+
+```{r}
+#Logistic regression assumes a parametric model
+# P(Y = 1 | X) = exp(β0 +β1X1 +...+βpXp) /  1+exp(β0 +β1X1 +...+βpXp)
+X1 = 10
+X2 = 12
+predicted_probability = exp(-19.1519513 + (0.9678167*X1) + (0.2486162*X2)) / (1 + exp(-19.1519513 + (0.9678167*X1) + (0.2486162*X2)))
+predicted_probability
+```
+The manually calculated predicted probability for X1 = 10 and X2 = 12 is 0.001515656
+
+```{r}
+# Test set performances
+newdata <- data.frame(X17.99 = c(10), X10.38 = c(12))
+glm.prob.test = predict(glm.model,type = "response", newdata = newdata)
+glm.prob.test
+```
+
+The predicted probability using the logistic regression model glm for X1 = 10 and X2 = 12 is 0.001515656. 
+
+Both the predicted probabilities using manual calculation and the logistic regression model are the same. 
+
+#### (f) Use the glm previously fitted and the Bayes rule to compute the pre- dicted outcome Yˆ from the associated probability estimates (computed with predict) both on the training and the test set. Then compute the confusion table and prediction accuracy (rate of correctly classified observations) both on the training and test set. Comment on the results.
+
+```{r}
+glm.prob.train = predict(glm.model, type = "response")
+glm.label.train = rep("B", nrow(train_df))
+glm.label.train[glm.prob.train > .5] = "M"
+
+# Confusion matrix
+print("Training data - confusion matrix")
+tt.glm.train = table(True = train_df$M, Predicted = glm.label.train)
+tt.glm.train
+
+# Model Accuracy
+print("Training data - Model accuracy")
+mean(glm.label.train == train_df$M)
+
+# Test set performances
+glm.prob.test = predict(glm.model,type = "response", newdata = test_df)
+
+glm.label.test = rep("B", nrow(test_df))
+glm.label.test[glm.prob.test > .5] = "M"
+
+print("Testing data - confusion matrix")
+tt.glm.test = table(True = test_df$M, Predicted =glm.label.test )
+tt.glm.test
+
+print("Training data - Model accuracy")
+mean(glm.label.test == test_df$M)
+```
+
+1. The model has an accuracy of 89.25% on the training set. The model has performed well on the training data, on which it was trained. 
+
+2. For the training data confusion matrix, we see that 229 benign and 128 tumors are predicted accurately as True Psoitive and True Negatives. 
+
+3. The model has an accuracy of 89.286% on the testing set. The model has performed a little better than on training set. 
+
+4. From the confusion matrix for testing data, we see that 103 benign tumors and 47 malignant tumors are predicted accurately as True Positive and True Negatives. 
+
+We don't want malignant tumors to be predicted as benign tumors as that will put patients as risk and will change their treatment. The confusion matrix shows that 28 and 8 malignant tumors are predicted as benign for the training and testing datasets. 
+
+The linear model has performed generally well on both the datasets. 
+
+#### (g) Plot an image of the decision boundary (like the one in Figure 2.13 in the textbook, but without the purple dashed line) as follows:
+#### 􏰁 Generate a dense set (e.g. 10000 observations) of possible values for the predictors (X1,X2) within reasonable ranges; (the command expand.grid might come in handy)
+#### 􏰁 Use the glm model previously fitted to predict the outcome probabil- ities for every observation you have generated and use Bayes rule to compute the predicted outcomes;
+#### 􏰁 Plot predicted outcomes and associated predictors in a scatter plot together with the training set.
+#### Generate the same plot for probability cutoff values of 0.25 and 0.75. Comment on the results.
+```{r}
+#storing training dataset with predicted probabilities in new dataframe
+ML_fits = mutate(train_df , pred = predict(glm.model, data=train_df, type = "response"))
+nbp <- 1000;
+
+#creating sequence of both the columns within minimum and maximum ranges
+PredA <- seq(min(train_df$X17.99), max(train_df$X17.99), length = nbp) 
+PredB <- seq(min(train_df$X10.38), max(train_df$X10.38), length = nbp) 
+
+#using expand.grid function to create 10000 rows of the two columns
+Grid <- expand.grid(X17.99 = PredA, X10.38 = PredB)
+dense_id <- sample(nrow(Grid), 10000)
+Grid <- Grid[dense_id,]
+
+#predicting probabilities using logistic regression on the dense set
+v <- predict(glm.model,Grid, type = "response")
+
+#splitting into target classes B and M using 0.5 as threshold probability
+glm.label.dense = rep("B", nrow(Grid))
+glm.label.dense[v > .5] = "M"
+
+lm.label.dense = rep("B", nrow(ML_fits))
+lm.label.dense[ML_fits$pred > .5] = "M"
+
+#plotting the predicted values of denseset with training dataset
+ggplot(data = ML_fits, aes(x = X17.99, y = X10.38, color = lm.label.dense, shape = lm.label.dense), cex = 0.6 ) +
+  geom_point(data = Grid, aes(X17.99, X10.38, color = glm.label.dense) ,pch = ".") + geom_point(cex = 1.5)  + ggtitle("Decision region") + theme(legend.text = element_text(size = 10)) 
+```
+
+#### 0.25
+```{r}
+#storing training dataset with predicted probabilities in new dataframe
+ML_fits = mutate(train_df , pred = predict(glm.model, data=train_df))
+nbp <- 1000;
+
+#creating sequence of both the columns within minimum and maximum ranges
+PredA <- seq(min(train_df$X17.99), max(train_df$X17.99), length = nbp) 
+PredB <- seq(min(train_df$X10.38), max(train_df$X10.38), length = nbp) 
+
+#using expand.grid function to create 10000 rows of the two columns
+Grid <- expand.grid(X17.99 = PredA, X10.38 = PredB)
+dense_id <- sample(nrow(Grid), 10000)
+Grid <- Grid[dense_id,]
+v <- predict(glm.model,Grid)
+
+#splitting into target classes B and M using 0.5 as threshold probability
+glm.label.dense = rep("B", nrow(Grid))
+glm.label.dense[v > .25] = "M"
+
+lm.label.dense = rep("B", nrow(ML_fits))
+lm.label.dense[ML_fits$pred > .25] = "M"
+
+#plotting the predicted values of denseset with training dataset
+ggplot(data = ML_fits, aes(x = X17.99, y = X10.38, color = lm.label.dense, shape = lm.label.dense), cex = 0.2 ) +
+  geom_point(data = Grid, aes(X17.99, X10.38, color = glm.label.dense) ,pch = ".") + geom_point(cex = 1.5)  + ggtitle("Decision region") + theme(legend.text = element_text(size = 10)) 
+```
+
+###### 0.75
+```{r}
+#storing training dataset with predicted probabilities in new dataframe
+ML_fits = mutate(train_df , pred = predict(glm.model, data=train_df))
+nbp <- 1000;
+
+#creating sequence of both the columns within minimum and maximum ranges
+PredA <- seq(min(train_df$X17.99), max(train_df$X17.99), length = nbp) 
+PredB <- seq(min(train_df$X10.38), max(train_df$X10.38), length = nbp) 
+
+#using expand.grid function to create 10000 rows of the two columns
+Grid <- expand.grid(X17.99 = PredA, X10.38 = PredB)
+dense_id <- sample(nrow(Grid), 10000)
+Grid <- Grid[dense_id,]
+v <- predict(glm.model,Grid)
+
+#splitting into target classes B and M using 0.5 as threshold probability
+glm.label.dense = rep("B", nrow(Grid))
+glm.label.dense[v > .75] = "M"
+
+lm.label.dense = rep("B", nrow(ML_fits))
+lm.label.dense[ML_fits$pred > .75] = "M"
+
+#plotting the predicted values of denseset with training dataset
+ggplot(data = ML_fits, aes(x = X17.99, y = X10.38, color = lm.label.dense, shape = lm.label.dense), cex = 0.2 ) +
+  geom_point(data = Grid, aes(X17.99, X10.38, color = glm.label.dense) ,pch = ".") + geom_point(cex = 1.5)  + ggtitle("Decision region") + theme(legend.text = element_text(size = 10)) 
+```
+
+The overlay of the training dataset on the dense set creates a linear decision boundary to predict for any observation to be either benign or malignant. 
+We keep increasing the threshold probability from 0.25 to 0.5 to then 0.75 which shifts the decision boundary towards the right by small margins. The model has the highest accuracy when threshold is taken as 0.5. For all the observations, if the probability is greater than 0.5, it is predicted as malignant tumor. 
+
+#### (h) Plot the ROC curve, computed on the test set, for a dense grid of possible cutoffs (e.g. 20 intervals).
+# ROC curve (test set)
+# FPR = FP/N; TPR = TP/P 
+```{r}
+n_segm = 20
+TPR = replicate(n_segm, 0)
+FPR = replicate(n_segm, 0)
+p_th = seq(0,1,length.out = n_segm)
+
+for (i in 1:n_segm)
+{
+  glm.label.test = rep("B", nrow(test_df))
+  glm.label.test[glm.prob.test > p_th[i]] = "M"
+  
+  tt.glm.test = table(True = test_df$M, Predicted = glm.label.test)
+  TPR[i] = mean(glm.label.test[test_df$M == 'M'] == test_df$M[test_df$M == 'M'])
+  FPR[i] = mean(glm.label.test[test_df$M == 'B'] != test_df$M[test_df$M == 'B'])
+}
+
+# plot(x = FPR, y = TPR, 'l')
+ggplot() + geom_path(aes(x = FPR, y = TPR))
+```
+
+### 2. Linear discriminant analysis model
+
+#### (a) Now fit a linear discriminant analysis model to the training set you created in Exercise 1. Make a table displaying the estimated ‘Prior probabilities of groups’ and ‘Group means’. Describe in words the meaning of these estimates and how they are related to the posterior probabilities.
+
+```{r}
+#creating lda model and fitting to the training data after centering and scaling
+lda.model = lda(M~., data = train_df, centre = TRUE, scale = TRUE)
+lda.model
+```
+
+
+Prior Probabilities:
+61% of the total tumors in training set are benign and 39% of total tumors in the training set are Malignant. 
+
+Group means:
+The mean of X17.99 variable for Benign tumors is 12.22459 and the mean of X17.99 variable for Malignant tumors is 17.65397
+
+The mean of X10.38 variable for Benign tumors is 17.62635  and the mean of X10.38 variable for Malignant tumors is 21.62968
+
+These values are deployed to compute posterior probability where QDA assumes that the variance of both classes B and M is the same.  
+
+#### (b) Use the fitted model and Bayes rule to compute the predicted outcome Yˆ from the predicted posterior probabilities, both on the training and test set. Then, compute the confusion table and prediction accuracy both on the training and test set. Comment on the results.
+
+```{r}
+#predicting using lda model on training and testing dataset
+lda.pred.train = predict(lda.model, train_df)
+lda.pred.test = predict(lda.model, test_df)
+
+names(lda.pred.train)
+
+#Training dataset - confusion matrix 
+print("Training data - confusion matrix")
+tt.lda.train = table(True = train_df$M, Predicted = lda.pred.train$class)
+tt.lda.train
+
+print("Training data - accuracy")
+mean(lda.pred.train$class == train_df$M)
+
+
+#testing dataset
+print("Testing data - confusion matrix")
+tt.lda.test = table(True = test_df$M, Predicted = lda.pred.test$class)
+tt.lda.test
+
+print("Testing data - accuracy")
+mean(lda.pred.test$class == test_df$M)
+
+#using posterior probability for determining class
+lda.pred.test_cutoff = rep("B", nrow(test_df))
+lda.pred.test_cutoff[lda.pred.test$posterior[,2] > .5] = "M"
+
+#printing confusion matrix and accuracy again after using posterior probability
+tt.lda.test_cutoff = table(True = test_df$M, Predicted = lda.pred.test$class)
+tt.lda.test_cutoff
+
+print("Testing data - confusion matrix")
+mean(lda.pred.test_cutoff == test_df$M)
+```
+
+1. The model has an accuracy of 87.5% on the training set. The model has performed well on the training data, on which it was trained. 
+
+2. For the training data confusion matrix, we see that 107 benign and 41 tumors are predicted accurately as True Positive and True Negatives. 
+
+3. The model has an accuracy of 88.09% on the testing set. The model has performed a little better than on training set. 
+
+4. From the confusion matrix for testing data, we see that 107 benign tumors and 41 malignant tumors are predicted accurately as True Positive and True Negatives. 
+
+We don't want malignant tumors to be predicted as benign tumors as that will put patients as risk and will change their treatment. The confusion matrix shows that 40 and 14 malignant tumors are predicted as benign for the training and testing datasets. 
+
+The LDA model has performed generally well on both the datasets
+
+#### (c) Plot an image of the decision boundary (follow the instructions in 1(g)). Generate the same plot for cutoff values of 0.25 and 0.75. Comment on the results.
+
+#### 0.5
+
+```{r}
+nbp <- 1000;
+
+#creating sequence of predictors
+PredA <- seq(min(train_df$X17.99), max(train_df$X17.99), length = nbp) 
+PredB <- seq(min(train_df$X10.38), max(train_df$X10.38), length = nbp)
+
+#creating grid of 10000 rows using expand.grid
+Grid <- expand.grid(X17.99 = PredA, X10.38 = PredB)
+dense_id <- sample(nrow(Grid), 10000)
+Grid <- Grid[dense_id,]
+
+#predict using lda model
+v <- predict(lda.model,Grid, type = "response")
+
+#categorizing using threshold probability of 0.5
+lda.label.dense = rep("B", nrow(Grid))
+lda.label.dense[v$posterior[,2] > 0.5] = "M"
+
+lm.label.dense = rep("B", nrow(train_df))
+lm.label.dense[lda.pred.train$posterior[,2] > .5] = "M"
+
+#plotting overlaying of training and dense data with color coding of the classes
+ggplot(data = train_df, aes(x = X17.99, y = X10.38, color = lm.label.dense, shape = lm.label.dense), cex = 0.2 ) +
+  geom_point(data = Grid, aes(X17.99, X10.38, color = lda.label.dense) ,pch = ".") + geom_point(cex = 1.5)  + ggtitle("Decision region") + theme(legend.text = element_text(size = 10)) 
+
+```
+
+# 0.25
+```{r}
+nbp <- 1000;
+
+#creating sequence of predictors
+PredA <- seq(min(train_df$X17.99), max(train_df$X17.99), length = nbp) 
+PredB <- seq(min(train_df$X10.38), max(train_df$X10.38), length = nbp)
+
+#creating grid of 10000 rows using expand.grid
+Grid <- expand.grid(X17.99 = PredA, X10.38 = PredB)
+dense_id <- sample(nrow(Grid), 10000)
+Grid <- Grid[dense_id,]
+
+#predict using lda model
+v <- predict(lda.model,Grid, type = "response")
+
+#categorizing using threshold probability of 0.25
+lda.label.dense = rep("B", nrow(Grid))
+lda.label.dense[v$posterior[,2] > 0.25] = "M"
+
+lm.label.dense = rep("B", nrow(train_df))
+lm.label.dense[lda.pred.train$posterior[,2] > .25] = "M"
+
+#plotting overlaying of training and dense data with color coding of the classes
+ggplot(data = train_df, aes(x = X17.99, y = X10.38, color = lm.label.dense, shape = lm.label.dense), cex = 0.2 ) +
+  geom_point(data = Grid, aes(X17.99, X10.38, color = lda.label.dense) ,pch = ".") + geom_point(cex = 1.5)  + ggtitle("Decision region") + theme(legend.text = element_text(size = 10)) 
+
+```
+
+# 0.75
+```{r}
+nbp <- 1000;
+
+#creating sequence of predictors
+PredA <- seq(min(train_df$X17.99), max(train_df$X17.99), length = nbp) 
+PredB <- seq(min(train_df$X10.38), max(train_df$X10.38), length = nbp)
+
+#creating grid of 10000 rows using expand.grid
+Grid <- expand.grid(X17.99 = PredA, X10.38 = PredB)
+dense_id <- sample(nrow(Grid), 10000)
+Grid <- Grid[dense_id,]
+
+#predict using lda model
+v <- predict(lda.model,Grid, type = "response")
+
+#categorizing using threshold probability of 0.75
+lda.label.dense = rep("B", nrow(Grid))
+lda.label.dense[v$posterior[,2] > 0.75] = "M"
+
+lm.label.dense = rep("B", nrow(train_df))
+lm.label.dense[lda.pred.train$posterior[,2] > .75] = "M"
+
+#plotting overlaying of training and dense data with color coding of the classes
+ggplot(data = train_df, aes(x = X17.99, y = X10.38, color = lm.label.dense, shape = lm.label.dense), cex = 0.2 ) +
+  geom_point(data = Grid, aes(X17.99, X10.38, color = lda.label.dense) ,pch = ".") + geom_point(cex = 1.5)  + ggtitle("Decision region") + theme(legend.text = element_text(size = 10)) 
+
+```
+The overlay of the training dataset on the dense set creates a linear decision boundary using LDA model to predict for any observation to be either benign or malignant. 
+We keep increasing the threshold probability from 0.25 to 0.5 to then 0.75 which shifts the decision boundary towards the right by small margins. The model has the highest accuracy when threshold is taken as 0.5. For all the observations, if the probability is greater than 0.5, it is predicted as malignant tumor.
+
+#### (d) Plot the ROC curve, computed on the test set, for a dense grid of possible cutoffs (e.g. 20 intervals).
+# ROC curve (test set)
+# FPR = FP/N; TPR = TP/P 
+```{r}
+n_segm = 20
+TPR = replicate(n_segm, 0)
+FPR = replicate(n_segm, 0)
+p_th = seq(0,1,length.out = n_segm)
+
+for (i in 1:n_segm)
+{
+  lda.label.test = rep("B", nrow(test_df))
+  lda.label.test[lda.pred.test$posterior[,2] > p_th[i]] = "M"
+  
+  tt.lda.test = table(True = test_df$M, Predicted = lda.label.test)
+  TPR[i] = mean(lda.label.test[test_df$M == 'M'] == test_df$M[test_df$M == 'M'])
+  FPR[i] = mean(lda.label.test[test_df$M == 'B'] != test_df$M[test_df$M == 'B'])
+}
+
+# plot(x = FPR, y = TPR, 'l')
+ggplot() + geom_path(aes(x = FPR, y = TPR))
+
+```
+#### (e) Compute an estimate of the Area under the ROC Curve (AUC).
+```{r}
+simple_auc <- function(TPR, FPR){
+  TPR = sort(TPR)
+  FPR = sort(FPR)
+  # inputs already sorted, best scores first 
+  dFPR <- c(diff(FPR), 0)
+  dTPR <- c(diff(TPR), 0)
+  sum(TPR * dFPR) + sum(dTPR * dFPR)/2
+}
+simple_auc(TPR, FPR)
+```
+
+
+### 3. Quadratic discriminant analysis model
+
+#### (a) Now fit a quadratic discriminant analysis model to the training set you created in Exercise 1. Make a table displaying the estimated ‘Prior probabilities of groups’ and ‘Group means’. Describe in words the meaning of these estimates and how they are related to the posterior probabilities.
+
+```{r}
+qda.model = qda(M~., data = train_df, centre = TRUE)
+qda.model
+```
+
+Prior Probabilities:
+61% of the total tumors in training set are benign and 39% of total tumors in the training set are Malignant. 
+
+Group means:
+The mean of X17.99 variable for Benign tumors is 12.22459 and the mean of X17.99 variable for Malignant tumors is 17.65397
+
+The mean of X10.38 variable for Benign tumors is 17.62635  and the mean of X10.38 variable for Malignant tumors is 21.62968
+
+These values are deployed to compute posterior probability where QDA assumes that the variance of both classes B and M is the same.  
+
+#### (b) Use the fitted model and Bayes rule to compute the predicted outcome Yˆ from the predicted posterior probabilities, both on the training and test set. Then, compute the confusion table and prediction accuracy both on the training and test set. Comment on the results.
+
+```{r}
+#predicting on training and testing dataset using qda model
+qda.pred.train = predict(qda.model, train_df)
+qda.pred.test = predict(qda.model, test_df)
+
+names(qda.pred.train)
+
+#confusion matrix
+print("Training data - confusion matrix")
+tt.qda.train = table(True = train_df$M, Predicted = qda.pred.train$class)
+tt.qda.train
+
+print("Training data - accuracy")
+mean(qda.pred.train$class == train_df$M)
+
+
+print("Testing data - confusion matrix")
+tt.qda.test = table(True = test_df$M, Predicted = qda.pred.test$class)
+tt.qda.test
+print("Testing data - accuracy")
+mean(qda.pred.test$class == test_df$M)
+
+#using posterior probability for determining class
+qda.pred.test_cutoff = rep("B", nrow(test_df))
+qda.pred.test_cutoff[qda.pred.test$posterior[,2] > .5] = "M"
+
+#showing accuracy again using posterior probability
+mean(qda.pred.test_cutoff == test_df$M)
+```
+
+1. The model has an accuracy of 87.5% on the training set. The model has performed well on the training data, on which it was trained. 
+
+2. For the training data confusion matrix, we see that 232 benign and 118 tumors are predicted accurately as True Positive and True Negatives. 
+
+3. The model has an accuracy of 88.09% on the testing set. The model has performed a little better than on training set. 
+
+4. From the confusion matrix for testing data, we see that 105 benign tumors and 43 malignant tumors are predicted accurately as True Positive and True Negatives. 
+
+We don't want malignant tumors to be predicted as benign tumors as that will put patients as risk and will change their treatment. The confusion matrix shows that 38 and 12 malignant tumors are predicted as benign for the training and testing datasets. 
+
+The QDA model has performed generally well on both the datasets but QDA has performed better than LDA. 
+
+
+#### (c) Plot an image of the decision boundary (follow the instructions in 1(g)). Generate the same plot for cutoff values of 0.25 and 0.75. Comment on the results.
+
+```{r}
+nbp <- 1000;
+
+#creating sequence of 1000 length of both predictors
+PredA <- seq(min(train_df$X17.99), max(train_df$X17.99), length = nbp) 
+PredB <- seq(min(train_df$X10.38), max(train_df$X10.38), length = nbp)
+
+#expanding grid to 10000
+Grid <- expand.grid(X17.99 = PredA, X10.38 = PredB)
+dense_id <- sample(nrow(Grid), 10000)
+Grid <- Grid[dense_id,]
+
+#predicting on dense data using qda model
+v <- predict(qda.model,Grid, type = "response")
+
+#catergorising using 0.5 as threshold probability
+qda.label.dense = rep("B", nrow(Grid))
+qda.label.dense[v$posterior[,2] > 0.5] = "M"
+
+lm.label.dense = rep("B", nrow(train_df))
+lm.label.dense[lda.pred.train$posterior[,2] > .5] = "M"
+
+#plotting with overlaying of training data and dense data
+ggplot(data = train_df, aes(x = X17.99, y = X10.38, color = lm.label.dense, shape = lm.label.dense), cex = 0.2 ) +
+  geom_point(data = Grid, aes(X17.99, X10.38, color = qda.label.dense) ,pch = ".") + geom_point(cex = 1.5)  + ggtitle("Decision region") + theme(legend.text = element_text(size = 10)) 
+
+```
+
+
+# 0.25 - qda
+```{r}
+nbp <- 1000;
+
+#creating sequence of 1000 length of both predictors
+PredA <- seq(min(train_df$X17.99), max(train_df$X17.99), length = nbp) 
+PredB <- seq(min(train_df$X10.38), max(train_df$X10.38), length = nbp)
+
+#expanding grid to 10000
+Grid <- expand.grid(X17.99 = PredA, X10.38 = PredB)
+dense_id <- sample(nrow(Grid), 10000)
+Grid <- Grid[dense_id,]
+
+#predicting on dense data using qda model
+v <- predict(qda.model,Grid, type = "response")
+
+#catergorising using 0.5 as threshold probability
+qda.label.dense = rep("B", nrow(Grid))
+qda.label.dense[v$posterior[,2] > 0.25] = "M"
+
+lm.label.dense = rep("B", nrow(train_df))
+lm.label.dense[lda.pred.train$posterior[,2] > .25] = "M"
+
+#plotting with overlaying of training data and dense data
+ggplot(data = train_df, aes(x = X17.99, y = X10.38, color = lm.label.dense, shape = lm.label.dense), cex = 0.2 ) +
+  geom_point(data = Grid, aes(X17.99, X10.38, color = qda.label.dense) ,pch = ".") + geom_point(cex = 1.5)  + ggtitle("Decision region") + theme(legend.text = element_text(size = 10)) 
+
+```
+
+# 0.75 - qda
+
+```{r}
+nbp <- 1000;
+
+#creating sequence of 1000 length of both predictors
+PredA <- seq(min(train_df$X17.99), max(train_df$X17.99), length = nbp) 
+PredB <- seq(min(train_df$X10.38), max(train_df$X10.38), length = nbp)
+
+#expanding grid to 10000
+Grid <- expand.grid(X17.99 = PredA, X10.38 = PredB)
+dense_id <- sample(nrow(Grid), 10000)
+Grid <- Grid[dense_id,]
+
+#predicting on dense data using qda model
+v <- predict(qda.model,Grid, type = "response")
+
+#catergorising using 0.5 as threshold probability
+qda.label.dense = rep("B", nrow(Grid))
+qda.label.dense[v$posterior[,2] > 0.75] = "M"
+
+lm.label.dense = rep("B", nrow(train_df))
+lm.label.dense[lda.pred.train$posterior[,2] > .75] = "M"
+
+#plotting with overlaying of training data and dense data
+ggplot(data = train_df, aes(x = X17.99, y = X10.38, color = lm.label.dense, shape = lm.label.dense), cex = 0.2 ) +
+  geom_point(data = Grid, aes(X17.99, X10.38, color = qda.label.dense) ,pch = ".") + geom_point(cex = 1.5)  + ggtitle("Decision region") + theme(legend.text = element_text(size = 10)) 
+
+```
+The overlay of the training dataset on the dense set creates a linear decision boundary using QDA model to predict for any observation to be either benign or malignant. 
+We keep increasing the threshold probability from 0.25 to 0.5 to then 0.75 which shifts the decision boundary towards the right by small margins. The model has the highest accuracy when threshold is taken as 0.5. For all the observations, if the probability is greater than 0.5, it is predicted as malignant tumor.
+
+#### (d) Plot the ROC curve for qda, computed on the test set, for a dense grid of possible cutoffs (e.g. 20 intervals).
+# ROC curve (test set)
+# FPR = FP/N; TPR = TP/P 
+```{r}
+n_segm = 20
+TPR_qda = replicate(n_segm, 0)
+FPR_qda = replicate(n_segm, 0)
+p_th = seq(0,1,length.out = n_segm)
+
+for (i in 1:n_segm)
+{
+  qda.label.test = rep("B", nrow(test_df))
+  qda.label.test[qda.pred.test$posterior[,2] > p_th[i]] = "M"
+  
+  tt.qda.test = table(True = test_df$M, Predicted = qda.label.test)
+  TPR_qda[i] = mean(qda.label.test[test_df$M == 'M'] == test_df$M[test_df$M == 'M'])
+  FPR_qda[i] = mean(qda.label.test[test_df$M == 'B'] != test_df$M[test_df$M == 'B'])
+}
+
+# plot(x = FPR, y = TPR, 'l')
+ggplot() + geom_path(aes(x = FPR_qda, y = TPR_qda))
+
+```
+
+#### (e) Compute an estimate of the Area under the ROC Curve (AUC) for qda
+```{r}
+simple_auc(TPR_qda, FPR_qda)
+```
+
+
+#### 4. Now we decide to use a kNN classifier.
+
+##### (a) For all choices of k = {1, 2, 3, 4, 20} (number of neighbors), compute the predicted outcome Yˆ both on the training and test set. Then, compute the confusion table and prediction accuracy both on the training and test set. Comment on the results.
+
+```{r}
+test_df$M = as.factor(test_df$M)
+
+#selects only the numeric values
+train.num = train_df[,!sapply(train_df, is.factor)]
+
+#scaling the training dataset
+train.num = scale(train.num)
+test.num = test_df[,!sapply(test_df, is.factor)]
+test.num = scale(test.num)
+
+train.M.dummy = model.matrix(~M - 1, data = train_df)
+test.M.dummy = model.matrix(~M - 1, data = test_df)
+```
+
+```{r}
+
+## "Fit" KNN (the output is a vector of predicted outcomes)
+#creating a vector of k values
+k = c(1,2,3,4,20)
+
+for (i in k){
+  
+  cat("Taking k = ", i, "\n")
+  knn.train.pred <- knn(train = train.num,
+                      test  = train.num,
+                      cl    = train_df$M, k = i)
+  knn.test.pred <- knn(train = train.num,
+                     test  = test.num,
+                     cl    = train_df$M, k = i)
+  tt.knn.train = table(True = train_df$M, Predicted =  knn.train.pred)
+  
+  print(tt.knn.train)
+  cat("Training Accuracy = ", mean(knn.train.pred == train_df$M), "\n")
+
+  tt.knn.test = table(True = test_df$M, False = knn.test.pred)
+  
+  print(tt.knn.test)
+  cat("Testing Accuracy = ", mean(knn.test.pred == test_df$M), "\n")
+}
+```
+
+Observations: 
+For k = 1, the training set accuracy is 1 and testing accuracy is 0.88. This is probably because the model overfits the data at k = 1 due to low bias and high variance.
+
+For k =2, the the training set accuracy is 0.9225 and testing accuracy is 0.88. this model performs better than k = 1 as it doesn't overfit the training dataset as much. 
+
+For k = 3, the model works well on both datasets with accuracy as 0.92 and 0.91 for training and testing datasets. Moreober, the variance is lower and bias is higher at k=3 than at k=1.
+
+For k = 20, the model accuracy is very different for training and testing datasets due to higher bias and lower variance. 
+
+k = 3 seems like the ideal value for achieving the best performance of the knn model.
+
+##### (b) Plot an image of the decision boundary (follow the instructions in 1(h)), for k = {1, 2, 3, 4, 20} (number of neighbors). Comment on the results.
+
+
+```{r}
+nbp <- 1000;
+PredA <- seq(min(train_df$X17.99), max(train_df$X17.99), length = nbp) 
+PredB <- seq(min(train_df$X10.38), max(train_df$X10.38), length = nbp)
+Grid <- expand.grid(X17.99 = PredA, X10.38 = PredB) 
+dense_id <- sample(nrow(Grid), 10000)
+Grid <- Grid[dense_id,]
+Grid <-  as.data.frame(scale(Grid))
+train.num <- as.data.frame((train.num))
+
+knn.prob.dense <- knn(train = train.num,
+                      test  = Grid,
+                      cl    = train_df$M, k = 1)
+
+ggplot(data = train.num, aes(x = X17.99, y = X10.38, color = knn.train.pred, shape = knn.train.pred, cex = 0.2 )) +
+  geom_point(data = Grid, aes(X17.99, X10.38, color = knn.prob.dense) ,pch = ".") + geom_point(cex = 0.4)  + xlim(-2, 2)+
+     ylim(-2, 2) + ggtitle("Decision region") + theme(legend.text = element_text(size = 10)) 
+
+```
+
+##### K = 2
+
+```{r}
+nbp <- 1000;
+PredA <- seq(min(train_df$X17.99), max(train_df$X17.99), length = nbp) 
+PredB <- seq(min(train_df$X10.38), max(train_df$X10.38), length = nbp)
+Grid <- expand.grid(X17.99 = PredA, X10.38 = PredB) 
+dense_id <- sample(nrow(Grid), 10000)
+Grid <- Grid[dense_id,]
+Grid <-  as.data.frame(scale(Grid))
+train.num <- as.data.frame((train.num))
+
+knn.prob.dense <- knn(train = train.num,
+                      test  = Grid,
+                      cl    = train_df$M, k = 2)
+
+ggplot(data = train.num, aes(x = X17.99, y = X10.38, color = knn.train.pred, shape = knn.train.pred, cex = 0.2 )) +
+  geom_point(data = Grid, aes(X17.99, X10.38, color = knn.prob.dense) ,pch = ".") + geom_point(cex = 0.4)  + xlim(-2, 2)+
+     ylim(-2, 2) + ggtitle("Decision region") + theme(legend.text = element_text(size = 10)) 
+
+```
+
+
+##### K = 3
+
+```{r}
+nbp <- 1000;
+PredA <- seq(min(train_df$X17.99), max(train_df$X17.99), length = nbp) 
+PredB <- seq(min(train_df$X10.38), max(train_df$X10.38), length = nbp)
+Grid <- expand.grid(X17.99 = PredA, X10.38 = PredB) 
+dense_id <- sample(nrow(Grid), 10000)
+Grid <- Grid[dense_id,]
+Grid <-  as.data.frame(scale(Grid))
+train.num <- as.data.frame((train.num))
+
+knn.prob.dense <- knn(train = train.num,
+                      test  = Grid,
+                      cl    = train_df$M, k = 3)
+
+ggplot(data = train.num, aes(x = X17.99, y = X10.38, color = knn.train.pred, shape = knn.train.pred, cex = 0.2 )) +
+  geom_point(data = Grid, aes(X17.99, X10.38, color = knn.prob.dense) ,pch = ".") + geom_point(cex = 0.4)  + xlim(-2, 2)+
+     ylim(-2, 2) + ggtitle("Decision region") + theme(legend.text = element_text(size = 10)) 
+
+```
+
+
+##### K = 4
+
+```{r}
+nbp <- 1000;
+PredA <- seq(min(train_df$X17.99), max(train_df$X17.99), length = nbp) 
+PredB <- seq(min(train_df$X10.38), max(train_df$X10.38), length = nbp)
+Grid <- expand.grid(X17.99 = PredA, X10.38 = PredB) 
+dense_id <- sample(nrow(Grid), 10000)
+Grid <- Grid[dense_id,]
+Grid <-  as.data.frame(scale(Grid))
+train.num <- as.data.frame((train.num))
+
+knn.prob.dense <- knn(train = train.num,
+                      test  = Grid,
+                      cl    = train_df$M, k = 4)
+
+ggplot(data = train.num, aes(x = X17.99, y = X10.38, color = knn.train.pred, shape = knn.train.pred, cex = 0.2 )) +
+  geom_point(data = Grid, aes(X17.99, X10.38, color = knn.prob.dense) ,pch = ".") + geom_point(cex = 0.4)  + xlim(-2, 2)+
+     ylim(-2, 2) + ggtitle("Decision region") + theme(legend.text = element_text(size = 10)) 
+
+```
+
+
+
+##### K = 20
+```{r}
+nbp <- 1000;
+PredA <- seq(min(train_df$X17.99), max(train_df$X17.99), length = nbp) 
+PredB <- seq(min(train_df$X10.38), max(train_df$X10.38), length = nbp)
+Grid <- expand.grid(X17.99 = PredA, X10.38 = PredB) 
+dense_id <- sample(nrow(Grid), 10000)
+Grid <- Grid[dense_id,]
+Grid <-  as.data.frame(scale(Grid))
+train.num <- as.data.frame((train.num))
+
+knn.prob.dense <- knn(train = train.num,
+                      test  = Grid,
+                      cl    = train_df$M, k = 20)
+
+ggplot(data = train.num, aes(x = X17.99, y = X10.38, color = knn.train.pred, shape = knn.train.pred, cex = 0.2 )) +
+  geom_point(data = Grid, aes(X17.99, X10.38, color = knn.prob.dense) ,pch = ".") + geom_point(cex = 0.4)  + xlim(-2, 2)+
+     ylim(-2, 2) + ggtitle("Decision region") + theme(legend.text = element_text(size = 10)) 
+
+```
+
+1. The model overfits at k = 1. The model has very high variance and low bvias as it classifies each observation into its class. The blue decision area is for malignant tumors. 
+
+2. As k value increases, the decision boundary generalises more. when k = 3, the model is more accurately able to predict the class for the observation without overfitting on the training dataset. 
+
+
+3. When k=20, the model has high bias and low variance. It almost seems like a binary decision model with no outliers. 
+
+k = 3 seems like the ideal value of k for getting the best performance of the knn model. 
+
+
+##### (c) Compute and plot the prediction accuracy (both on the training and test set), for k = {1,2,...,19,20} (number of neighbors). Which value of k would you choose? Comment on the results.
+
+``` {r}
+pred <- data.frame(matrix(ncol = 3, nrow = 0))
+colnames(pred) <-  c("k", "train", "test")
+
+for (i in 1:20){
+  
+  knn.train.pred <- knn(train = train.num,
+                      test  = train.num,
+                      cl    = train_df$M, k = i)
+  knn.test.pred <- knn(train = train.num,
+                     test  = test.num,
+                     cl    = train_df$M, k = i)
+       
+  pred <- rbind(pred, 
+                data.frame(k=i, train=mean(knn.train.pred ==train_df$M), test=mean(knn.test.pred == test_df$M)))
+}
+
+pred
+```
+
+
+
+```{r}
+pred %>% ggplot(aes(x=k)) +
+  geom_line(aes(y=train), color = "blue" ) +
+  geom_line(aes(y=test), color = "green") + ggtitle("k value vs train test accuracies") 
+```
+
+The training plot is depicted in blue and the testing plot is given in green. 
+The training data accuracy reduces initially due to overfitting at k = 1 and then starts increasing as k increases. The testing data accuracy starts increases at k =1 due to overfitting to training data but then fluctuates. k = 3 is the ideal k value as the training and testing accuracies are similar and based on bias- variance trade off, it has the best performance. 
